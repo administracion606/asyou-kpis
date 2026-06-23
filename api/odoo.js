@@ -5,13 +5,17 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end()
   try {
     const path = req.query.path || '/web/dataset/call_kw'
+    // Inyectar db en el body
+    const body = { ...req.body }
+    if (body.params) body.params = { ...body.params, db: 'retailasyou' }
+    
     const response = await fetch('https://retailasyou.odoo.com' + path, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Basic ' + Buffer.from('b6397567586fb28ce324157bf57a60a97d37b01e:').toString('base64')
       },
-      body: JSON.stringify(req.body)
+      body: JSON.stringify(body)
     })
     const data = await response.json()
     res.status(200).json(data)
