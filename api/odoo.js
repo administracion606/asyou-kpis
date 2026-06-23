@@ -1,23 +1,45 @@
+const ODOO = 'https://retailasyou.odoo.com'
+const DB = 'retailasyou'
+const USER = 'administracion@martinamodacolombia.com'
+const PASS = 'Martina123.'
+
+let sessionId = null
+
+async function getSession() {
+  const res = await fetch(`${ODOO}/web/session/authenticate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ jsonrpc:'2.0', method:'call', params: { db: DB, login: USER, password: PASS } })
+  })
+  const setCookie = res.headers.get('set-cookie') || ''
+  const match = setCookie.match(/session_id=([^;]+)/)
+  if (match) sessionId = match[1]
+  const data = await res.json()
+  if (!data.result?.uid) throw new Error('Auth failed: ' + JSON.stringify(data.error))
+  return sessionId
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
   if (req.method === 'OPTIONS') return res.status(200).end()
   try {
+    if (!sessionId) await getSession()
     const path = req.query.path || '/web/dataset/call_kw'
-    // Inyectar db en el body
-    const body = { ...req.body }
-    if (body.params) body.params = { ...body.params, db: 'retailasyou' }
-    
-    const response = await fetch('https://retailasyou.odoo.com' + path, {
+    const response = await fetch(`${ODOO}${path}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': 'Basic ' + Buffer.from('b6397567586fb28ce324157bf57a60a97d37b01e:').toString('base64')
+        'Cookie': `session_id=${sessionId}`
       },
-      body: JSON.stringify(body)
+      body: JSON.stringify(req.body)
     })
     const data = await response.json()
+    if (data.error?.data?.name === 'odoo.exceptions.AccessDenied') {
+      sessionId = null
+      throw new Error('Session expired')
+    }
     res.status(200).json(data)
   } catch (e) {
     res.status(500).json({ error: e.message })
