@@ -10,30 +10,36 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end()
 
   try {
-    // Autenticar en cada llamada (stateless)
     const authRes = await fetch(`${ODOO}/web/session/authenticate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ jsonrpc:'2.0', method:'call', id:1, params: { db: DB, login: USER, password: PASS } })
     })
     const authData = await authRes.json()
-    if (!authData.result?.uid) throw new Error('Auth failed: ' + JSON.stringify(authData.error || 'no uid'))
+    console.log('AUTH RESULT:', JSON.stringify(authData).substring(0, 500))
+    console.log('AUTH COOKIES:', authRes.headers.get('set-cookie'))
+    
+    if (!authData.result?.uid) {
+      return res.status(500).json({ error: 'Auth failed', detail: authData })
+    }
     
     const sessionId = authData.result.session_id
-    const cookie = authRes.headers.get('set-cookie') || `session_id=${sessionId}`
+    const setCookie = authRes.headers.get('set-cookie') || ''
+    console.log('SESSION ID:', sessionId)
 
-    // Hacer la llamada real
     const callRes = await fetch(`${ODOO}/web/dataset/call_kw`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Cookie': cookie
+        'Cookie': `session_id=${sessionId}`
       },
       body: JSON.stringify(req.body)
     })
     const data = await callRes.json()
+    console.log('CALL RESULT:', JSON.stringify(data).substring(0, 200))
     res.status(200).json(data)
   } catch (e) {
+    console.log('ERROR:', e.message)
     res.status(500).json({ error: e.message })
   }
 }
