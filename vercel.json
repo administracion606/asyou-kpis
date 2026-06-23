@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/odoo/:path*",
+      "destination": "https://retailasyou.odoo.com/:path*"
+    }
+  ]
+}
